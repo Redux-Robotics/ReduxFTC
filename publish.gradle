@@ -1,0 +1,108 @@
+apply plugin: 'com.android.library'
+apply plugin: 'maven-publish'
+apply plugin: 'signing'
+
+task libDocs(type: Javadoc) {
+    group = "Documentation"
+    description = "Generate Javadoc"
+    failOnError = false
+    source = android.sourceSets.main.java.srcDirs
+    classpath = project.files(android.getBootClasspath().join(File.pathSeparator))
+    options.memberLevel = JavadocMemberLevel.PROTECTED
+    options.addStringOption('Xmaxwarns', '1')
+    options.addStringOption('Xmaxerrs', '1')
+    options.links "http://developer.android.com/reference"
+}
+
+task javadocJar(type: Jar) {
+    dependsOn libDocs
+    from libDocs.destinationDir
+    archiveClassifier = 'javadoc'
+}
+
+task sourcesJar(type: Jar) {
+    from android.sourceSets.main.java.srcDirs
+    archiveClassifier = 'sources'
+}
+
+def lcl_groupId = project.PUBLISH_GROUP_ID
+def lcl_artifactId = project.PUBLISH_ARTIFACT_ID
+def lcl_version = project.PUBLISH_VERSION
+
+
+/*
+signing {
+    sign publishing.publications
+}*/
+
+/*
+ * https://developer.android.com/studio/build/maven-publish-plugin
+ *
+ * components.release automatically pulls the AAR for the library this
+ * plugin is applied to.
+ */
+
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                artifact sourcesJar
+                artifact javadocJar
+
+                // The coordinates of the library, being set from variables that
+                // we'll set up in a moment
+                groupId lcl_groupId
+                artifactId lcl_artifactId
+                version lcl_version
+
+                // Two artifacts, the `aar` and the sources
+                // artifact("$buildDir/outputs/aar/${project.getName()}-release.aar")
+                // artifact androidSourcesJar
+
+                // Self-explanatory metadata for the most part
+                pom {
+                    name = lcl_artifactId
+                    description = 'ReduxFTC'
+                    // If your project has a dedicated site, use its URL here
+                    url = 'https://github.com/Redux-Robotics/ReduxFTC'
+                    licenses {
+                        license {
+                            name = 'MIT'
+                            url = 'https://opensource.org/licenses/MIT'
+                        }
+                    }
+                    developers {
+                        developer {
+                            id = 'reduxrobotics'
+                            name = 'Redux FTC Developers'
+                            email = 'admin@reduxrobotics.com'
+                            organization = 'Redux Robotics'
+                            organizationUrl = 'openftc.org'
+                        }
+                    }
+                    // Version control info, if you're using GitHub, follow the format as seen here
+                    scm {
+                        connection = 'scm:git:github.com/Redux-Robotics/ReduxFTC.git'
+                        url = 'https://github.com/Redux-Robotics/ReduxFTC/tree/main'
+                    }
+                }
+            }
+        }
+
+        repositories {
+            // The repository to publish to, Sonatype/MavenCentral
+            maven {
+                // This is an arbitrary name, you may also use "mavencentral" or
+                // any other name that's descriptive for you
+                name = "mavenlocal"
+
+                def releasesRepoUrl = layout.buildDirectory.dir("repos/releases")
+                def snapshotsRepoUrl = layout.buildDirectory.dir("repos/snapshots")
+                // You only need this if you want to publish snapshots, otherwise just set the URL
+                // to the release repo directly
+                url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+            }
+        }
+    }
+}

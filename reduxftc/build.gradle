@@ -1,0 +1,68 @@
+apply plugin: 'com.android.library'
+
+ext {
+    PUBLISH_GROUP_ID = 'com.reduxrobotics.ftc'
+    PUBLISH_ARTIFACT_ID = 'reduxftc'
+    PUBLISH_VERSION = '2024.0.0'
+}
+
+android {
+    compileSdkVersion 23
+
+    defaultConfig {
+        minSdkVersion 23
+        targetSdkVersion 23
+        versionCode 1
+        versionName PUBLISH_VERSION
+    }
+
+    buildTypes {
+
+        debug {
+            ndk {
+                abiFilters "armeabi-v7a", "arm64-v8a"
+            }
+
+            buildConfigField("String","_VERSION_NAME", "\"DEV BUILD\"")
+        }
+
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
+            ndk {
+                abiFilters "armeabi-v7a", "arm64-v8a"
+            }
+
+            buildConfigField("String","_VERSION_NAME","\"" + PUBLISH_VERSION + "\"")
+        }
+    }
+
+    // Encapsulates your external native build configurations.
+    //externalNativeBuild {
+
+    //    // Encapsulates your CMake build configurations.
+    //    cmake {
+
+    //        // Provides a relative path to your CMake build script.
+    //        path "CMakeLists.txt"
+    //    }
+    //}
+
+    lintOptions {
+        abortOnError false
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_7
+        targetCompatibility JavaVersion.VERSION_1_7
+    }
+    ndkVersion '21.3.6528147'
+}
+
+dependencies {
+    //compileOnly fileTree(include: ['*.aar'], dir: '../libs')
+    compileOnly 'org.firstinspires.ftc:RobotCore:10.1.0'
+}
+
+apply from: '../publish.gradle'
+
