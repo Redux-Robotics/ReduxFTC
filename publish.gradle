@@ -78,7 +78,7 @@ afterEvaluate {
                             name = 'Redux FTC Developers'
                             email = 'admin@reduxrobotics.com'
                             organization = 'Redux Robotics'
-                            organizationUrl = 'openftc.org'
+                            organizationUrl = 'reduxrobotics.com'
                         }
                     }
                     // Version control info, if you're using GitHub, follow the format as seen here
@@ -95,7 +95,7 @@ afterEvaluate {
             maven {
                 // This is an arbitrary name, you may also use "mavencentral" or
                 // any other name that's descriptive for you
-                name = "mavenlocal"
+                //name = "mavenlocal"
 
                 def releasesRepoUrl = layout.buildDirectory.dir("repos/releases")
                 def snapshotsRepoUrl = layout.buildDirectory.dir("repos/snapshots")

@@ -1,0 +1,35 @@
+name: "Build"
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: "Build ReduxFTC AAR and Maven"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Compile the thing
+        run: ./gradlew publish
+      - name: Compile it again for good luck (don't ask)
+        run: ./gradlew publish
+      - name: Upload AAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: reduxftc-${{github.ref_name}}.aar
+          path: reduxftc/build/outputs/aar/reduxftc-release.aar
+      - name: Prep Maven zip
+        run: mkdir -p output/maven && mv reduxftc/build/repos/releases/* output/maven
+      - name: Upload Maven zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: reduxftc-${{github.ref_name}}
+          path: output
+

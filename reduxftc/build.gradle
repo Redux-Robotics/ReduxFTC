@@ -3,7 +3,7 @@ apply plugin: 'com.android.library'
 ext {
     PUBLISH_GROUP_ID = 'com.reduxrobotics.ftc'
     PUBLISH_ARTIFACT_ID = 'reduxftc'
-    PUBLISH_VERSION = '2024.0.0'
+    PUBLISH_VERSION = '2024.1.0'
 }
 
 android {
@@ -61,7 +61,8 @@ android {
 
 dependencies {
     //compileOnly fileTree(include: ['*.aar'], dir: '../libs')
-    compileOnly 'org.firstinspires.ftc:RobotCore:10.1.0'
+    compileOnly 'org.firstinspires.ftc:RobotCore:10.0.0'
+    compileOnly 'org.firstinspires.ftc:Hardware:10.0.0'
 }
 
 apply from: '../publish.gradle'

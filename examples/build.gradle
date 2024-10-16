@@ -31,6 +31,6 @@ android {
 
 dependencies {
     //implementation fileTree(dir: 'libs', include: ['*.jar'])
-    compileOnly 'org.firstinspires.ftc:RobotCore:10.1.0'
+    compileOnly 'org.firstinspires.ftc:RobotCore:10.0.0'
     compileOnly project(':reduxftc')
 }
