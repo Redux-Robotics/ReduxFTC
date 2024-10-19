@@ -1,3 +1,9 @@
+# Disclaimer:
+
+This is an experimental project. Things here may change at any time. If your robot explodes because of a change here, we give no warrenty.
+
+This project is licensed BSD-2-Clause.
+
 # ReduxFTC: FTC libraries for Redux products
 
 This repository provides software libraries for Redux products compatible and intended to be used 
