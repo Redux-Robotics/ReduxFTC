@@ -46,7 +46,6 @@ import java.util.Set;
 @DeviceProperties(
     name = "Redux Canandgyro (Analog)",
     xmlTag = "ReduxAnalogCanandgyro",
-    builtIn = false,
     compatibleControlSystems = {ControlSystem.REV_HUB},
     description = "a Redux Robotics Canandgyro connected via the analog port"
 )
@@ -146,7 +145,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   }
 
   /**
-   * Fetches the zero offset that is subtracted from the analog reading to produce a re-zeroed yaw.
+   * Fetches the zero offset subtracted from the analog reading to produce a re-zeroed yaw.
    * <p>
    * You can think of {@link #getYaw} being computed as
    * <pre>
@@ -171,7 +170,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   }
 
   /**
-   * Sets the zero offset that is subtracted from the analog reading.
+   * Sets the zero offset subtracted from the analog reading.
    * <p>
    * You can think of {@link #getYaw} being computed as
    * <pre>
@@ -277,10 +276,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   }
 
   /**
-   * Initializes the IMU with non-default settings.
-   *
-   * @param parameters
-   * @return Whether initialization succeeded.
+   * This does nothing with the Canandgyro; it's only here to allow existing IMU uses to work.
    */
   @Override
   public boolean initialize(Parameters parameters) {
@@ -288,12 +284,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   }
 
   /**
-   * Resets the robot's yaw angle to 0. After calling this method, the reported orientation will
-   * be relative to the robot's position when this method was called, as if the robot was perfectly
-   * level right then. That is to say, the pitch and yaw will be ignored when this method is
-   * called.
-   * <p>
-   * Unlike yaw, pitch and roll are always relative to gravity, and never need to be reset.
+   * Resets the robot's yaw angle to 0
    */
   @Override
   public void resetYaw() {
@@ -312,9 +303,6 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   }
 
   /**
-   * @param reference
-   * @param order
-   * @param angleUnit
    * @return An {@link Orientation} object representing the current orientation of the robot
    * in the Robot Coordinate System, relative to the robot's position the last time
    * that {@link #resetYaw()} was called, as if the robot was perfectly level at that time.
@@ -367,7 +355,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
    */
   public double getYawVelocity(AngleUnit unit) {
     if (oldYawAge.milliseconds() > 1) { // only read if necessary (is this value big enough?)
-      getYaw(AngleUnit.RADIANS); // output value doesn't matter, just doing this to trigger the filter
+      getYaw(AngleUnit.RADIANS); // the output value doesn't matter, just doing this to trigger the filter
     }
     double yawVelocity = filteredYawVel;
     return unit.fromRadians(yawVelocity);
@@ -389,9 +377,9 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
    * @param yaw input yaw in radians
    */
   private void updateLowpassFilter(double yaw) {
-    if (yaw != oldYaw) { // if this is a different loop with different bulk read data
-      // update the low-pass filter
-      // is milliseconds the right unit?
+    if (yaw != oldYaw) { // ensure this is a different loop with different bulk read data,
+      // then update the low-pass filter
+      //(is milliseconds the right unit?)
       filteredYawVel += filteredYawVelAge.milliseconds() * (getRawYawVelocity(yaw) - filteredYawVel) / lowpassSmoothing;
       filteredYawVelAge.reset();
     }
