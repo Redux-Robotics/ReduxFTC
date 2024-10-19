@@ -206,7 +206,14 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
       tooltip = "Read the raw voltage with the zero offset applied."
   )
   public double readZeroedVoltage() {
-    double zeroed = readRawVoltage() - zeroOffset;
+    // deadband detection
+    double rawVoltage = readRawVoltage();
+    if (rawVoltage <= 0.005) {
+      rawVoltage = 0;
+    } else if (rawVoltage >= 3.295) {
+      rawVoltage = 3.3;
+    }
+    double zeroed = rawVoltage - zeroOffset;
     while (zeroed < 0.0) {
       zeroed += MAX_VOLTAGE;
     }
