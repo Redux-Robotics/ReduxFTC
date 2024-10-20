@@ -50,9 +50,9 @@ import java.util.Set;
     description = "a Redux Robotics Canandgyro connected via the analog port"
 )
 public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, HardwareDevice, IMU {
-  private AnalogInputController controller = null;
-  private int channel = -1;
-  private double zeroOffset = 0;
+  private final AnalogInputController controller;
+  private final int channel;
+  private double zeroOffset;
 
   // The canandgyro itself will only output a maximum of MAX_VOLTAGE volts.
   private static final double MAX_VOLTAGE = 3.3;
