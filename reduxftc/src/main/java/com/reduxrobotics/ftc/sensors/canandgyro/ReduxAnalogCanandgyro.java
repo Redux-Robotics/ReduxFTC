@@ -98,7 +98,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   }
 
   /**
-   * Get yaw directly from the voltage without the zero correction
+   * Get yaw directly from the voltage without the zero offset
    * @return raw yaw in degrees
    */
   private double getRawYaw() {
@@ -322,6 +322,10 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
    * for any orientation of the robot, even where other types of orientation data would
    * encounter issues such as gimbal lock.
    */
+  // qy and qw being the same is perfectly fine
+  // and extracing it into a variable would make this unnecessarily complicated
+  // also for some reason IntelliJ keeps forgetting this warning exists so also supress RedundantSuppression
+  @SuppressWarnings({"DuplicateExpressions", "RedundantSuppression"})
   @Override
   public Quaternion getRobotOrientationAsQuaternion() {
     // is this math right?
