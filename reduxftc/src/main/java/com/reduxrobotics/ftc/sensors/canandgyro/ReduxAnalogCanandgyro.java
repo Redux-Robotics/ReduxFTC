@@ -92,9 +92,26 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
       parameterLabels = { "angleUnit" }
   )
   public double getYaw(AngleUnit unit) {
-    double yaw = AngleUnit.normalizeDegrees(readZeroedVoltage() / MAX_VOLTAGE * 360.0);
+    double yaw = getRawYaw() - zeroOffset;
     updateLowpassFilter(yaw);
     return unit.fromDegrees(yaw);
+  }
+
+  /**
+   * Get yaw directly from the voltage without the zero correction
+   * @return raw yaw in degrees
+   */
+  private double getRawYaw() {
+    double rawVoltage = readRawVoltage();
+    // deadband detection
+    if (rawVoltage <= 0.005) {
+      return 0;
+    } else if (rawVoltage >= 3.295) {
+      return 360;
+    } else {
+      // corrects for error and nonlinearity in voltage read by the hub
+      return rawVoltage * 108.95105635 - 179.64903577;
+    }
   }
 
   /**
@@ -118,9 +135,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   public void setYaw(double newAngle, AngleUnit unit) {
     newAngle = unit.toDegrees(newAngle);
     resetLowpassFilter(newAngle);
-
-    newAngle *= MAX_VOLTAGE / 360.0;
-    zeroOffset = readRawVoltage() - newAngle;
+    zeroOffset = getRawYaw() - newAngle;
   }
 
   /**
@@ -167,7 +182,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
       parameterLabels = { "angleUnit" }
   )
   public double getZeroOffset(AngleUnit unit) {
-      return unit.fromDegrees(zeroOffset / MAX_VOLTAGE * 360);
+      return unit.fromDegrees(zeroOffset);
   }
 
   /**
@@ -191,38 +206,9 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
       parameterLabels = { "newOffset", "angleUnit" }
   )
   public void setZeroOffset(double newOffset, AngleUnit unit) {
-    newOffset = unit.toDegrees(newOffset) / 360;
-    zeroOffset = newOffset * MAX_VOLTAGE;
-
+    zeroOffset = unit.toDegrees(newOffset);
   }
 
-  /**
-   * Reads the raw voltage output with the zero offset applied.
-   *
-   * @return voltage from [0, 3.3) volts
-   */
-  @ExportToBlocks(
-      heading = "read zeroed voltage",
-      comment = "Read the raw voltage with the zero offset applied.",
-      tooltip = "Read the raw voltage with the zero offset applied."
-  )
-  public double readZeroedVoltage() {
-    // deadband detection
-    double rawVoltage = readRawVoltage();
-    if (rawVoltage <= 0.005) {
-      rawVoltage = 0;
-    } else if (rawVoltage >= 3.295) {
-      rawVoltage = 3.3;
-    }
-    double zeroed = rawVoltage - zeroOffset;
-    while (zeroed < 0.0) {
-      zeroed += MAX_VOLTAGE;
-    }
-    while (zeroed >= MAX_VOLTAGE) {
-      zeroed -= MAX_VOLTAGE;
-    }
-    return zeroed;
-  }
 
   /**
    * Reads the raw voltage output straight from the control/expansion hub.
