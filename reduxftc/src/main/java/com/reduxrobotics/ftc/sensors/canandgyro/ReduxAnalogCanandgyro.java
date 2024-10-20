@@ -25,21 +25,14 @@
  */
 package com.reduxrobotics.ftc.sensors.canandgyro;
 
-import com.qualcomm.robotcore.hardware.AnalogInputController;
-import com.qualcomm.robotcore.hardware.AnalogSensor;
-import com.qualcomm.robotcore.hardware.ControlSystem;
-import com.qualcomm.robotcore.hardware.HardwareDevice;
-import com.qualcomm.robotcore.hardware.OrientationSensor;
+import com.qualcomm.robotcore.hardware.*;
 import com.qualcomm.robotcore.hardware.configuration.annotations.AnalogSensorType;
 import com.qualcomm.robotcore.hardware.configuration.annotations.DeviceProperties;
 
+import com.qualcomm.robotcore.util.ElapsedTime;
 import org.firstinspires.ftc.robotcore.external.ExportClassToBlocks;
 import org.firstinspires.ftc.robotcore.external.ExportToBlocks;
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.AxesOrder;
-import org.firstinspires.ftc.robotcore.external.navigation.AxesReference;
-import org.firstinspires.ftc.robotcore.external.navigation.Axis;
-import org.firstinspires.ftc.robotcore.external.navigation.Orientation;
+import org.firstinspires.ftc.robotcore.external.navigation.*;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -47,23 +40,32 @@ import java.util.Set;
 /**
  * Device class for a Redux Robotics Canandgyro connected via an analog port.
  * @author guineawheek@reduxrobotics.com
+ * @author j5155 ftcjdhs@gmail.com
  */
 @ExportClassToBlocks
 @AnalogSensorType
 @DeviceProperties(
     name = "Redux Canandgyro (Analog)",
     xmlTag = "ReduxAnalogCanandgyro",
-    builtIn = false,
     compatibleControlSystems = {ControlSystem.REV_HUB},
     description = "a Redux Robotics Canandgyro connected via the analog port"
 )
-public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, HardwareDevice {
-  private AnalogInputController controller = null;
-  private int channel = -1;
-  private double zeroOffset = 0;
+public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, HardwareDevice, IMU {
+  private final AnalogInputController controller;
+  private final int channel;
+  private double zeroOffset;
 
   // The canandgyro itself will only output a maximum of MAX_VOLTAGE volts.
   private static final double MAX_VOLTAGE = 3.3;
+
+  private double oldYaw = 0; // degrees
+  private final ElapsedTime oldYawAge = new ElapsedTime();
+  private double filteredYawVel = 0; // degrees/sec
+  private final ElapsedTime filteredYawVelAge = new ElapsedTime();
+
+  private static final double lowpassSmoothing = 10.0; // https://phrogz.net/js/framerate-independent-low-pass-filter.html
+
+
 
   /**
    * Constructor
@@ -90,13 +92,26 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
       parameterLabels = { "angleUnit" }
   )
   public double getYaw(AngleUnit unit) {
-    switch (unit) {
-      case DEGREES:
-        return AngleUnit.normalizeDegrees(readZeroedVoltage() / MAX_VOLTAGE * 360.0);
-      case RADIANS:
-        return AngleUnit.normalizeRadians(readZeroedVoltage() / MAX_VOLTAGE * (Math.PI * 2));
+    double yaw = getRawYaw() - getZeroOffset(AngleUnit.DEGREES);
+    updateLowpassFilter(yaw);
+    return unit.fromDegrees(yaw);
+  }
+
+  /**
+   * Get yaw directly from the voltage without the zero offset
+   * @return raw yaw in degrees
+   */
+  private double getRawYaw() {
+    double rawVoltage = readRawVoltage();
+    // deadband detection
+    if (rawVoltage <= 0.005) {
+      return 0;
+    } else if (rawVoltage >= 3.295) {
+      return 360;
+    } else {
+      // corrects for error and nonlinearity in voltage read by the hub
+      return rawVoltage * 108.95105635 - 179.64903577;
     }
-    return 0;
   }
 
   /**
@@ -118,13 +133,9 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
       parameterLabels = { "newAngle", "angleUnit" }
   )
   public void setYaw(double newAngle, AngleUnit unit) {
-    if (unit == AngleUnit.RADIANS) {
-      newAngle = AngleUnit.RADIANS.toDegrees(newAngle);
-    } else {
-      newAngle = AngleUnit.normalizeDegrees(newAngle);
-    }
-    newAngle *= MAX_VOLTAGE / 360.0;
-    zeroOffset = readRawVoltage() - newAngle;
+    newAngle = unit.toDegrees(newAngle);
+    resetLowpassFilter(newAngle);
+    setZeroOffset(getRawYaw() - newAngle, AngleUnit.DEGREES);
   }
 
   /**
@@ -150,7 +161,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   }
 
   /**
-   * Fetches the zero offset that is subtracted from the analog reading to produce a re-zeroed yaw.
+   * Fetches the zero offset subtracted from the analog reading to produce a re-zeroed yaw.
    * <p>
    * You can think of {@link #getYaw} being computed as
    * <pre>
@@ -171,15 +182,11 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
       parameterLabels = { "angleUnit" }
   )
   public double getZeroOffset(AngleUnit unit) {
-    if (unit == AngleUnit.DEGREES) {
-      return AngleUnit.normalizeDegrees(zeroOffset / MAX_VOLTAGE * 360);
-    } else {
-      return AngleUnit.normalizeRadians(zeroOffset / MAX_VOLTAGE * 2 * Math.PI);
-    }
+      return unit.fromDegrees(zeroOffset);
   }
 
   /**
-   * Sets the zero offset that is subtracted from the analog reading.
+   * Sets the zero offset subtracted from the analog reading.
    * <p>
    * You can think of {@link #getYaw} being computed as
    * <pre>
@@ -199,35 +206,9 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
       parameterLabels = { "newOffset", "angleUnit" }
   )
   public void setZeroOffset(double newOffset, AngleUnit unit) {
-    if (unit == AngleUnit.DEGREES) {
-      newOffset = AngleUnit.normalizeDegrees(newOffset) / 360;
-    } else {
-      newOffset = AngleUnit.normalizeRadians(newOffset) / (2 * Math.PI);
-    }
-    zeroOffset = newOffset * MAX_VOLTAGE;
-
+    zeroOffset = unit.toDegrees(newOffset);
   }
 
-  /**
-   * Reads the raw voltage output with the zero offset applied.
-   *
-   * @return voltage from [0, 3.3) volts
-   */
-  @ExportToBlocks(
-      heading = "read zeroed voltage",
-      comment = "Read the raw voltage with the zero offset applied.",
-      tooltip = "Read the raw voltage with the zero offset applied."
-  )
-  public double readZeroedVoltage() {
-    double zeroed = readRawVoltage() - zeroOffset;
-    while (zeroed < 0.0) {
-      zeroed += MAX_VOLTAGE;
-    }
-    while (zeroed >= MAX_VOLTAGE) {
-      zeroed -= MAX_VOLTAGE;
-    }
-    return zeroed;
-  }
 
   /**
    * Reads the raw voltage output straight from the control/expansion hub.
@@ -286,5 +267,125 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
 
   @Override
   public void close() {
+  }
+
+  /**
+   * This does nothing with the Canandgyro; it's only here to allow existing IMU uses to work.
+   */
+  @Override
+  public boolean initialize(Parameters parameters) {
+    return true;
+  }
+
+  /**
+   * Resets the robot's yaw angle to 0
+   */
+  @Override
+  public void resetYaw() {
+    zero();
+  }
+
+  /**
+   * @return A {@link YawPitchRollAngles} object representing the current orientation of the robot
+   * in the Robot Coordinate System, relative to the robot's position the last time that
+   * {@link #resetYaw()} was called, as if the robot was perfectly level at that time.
+   */
+  @Override
+  public YawPitchRollAngles getRobotYawPitchRollAngles() {
+    // Blindly using System.nanoTime() here isn't ideal, but no better option, I think
+    return new YawPitchRollAngles(AngleUnit.DEGREES,getYaw(AngleUnit.DEGREES),0.0,0.0,System.nanoTime());
+  }
+
+  /**
+   * @return An {@link Orientation} object representing the current orientation of the robot
+   * in the Robot Coordinate System, relative to the robot's position the last time
+   * that {@link #resetYaw()} was called, as if the robot was perfectly level at that time.
+   * <p><p>
+   * The {@link Orientation} class provides many ways to represent the robot's orientation,
+   * which is helpful for advanced use cases. Most teams should use {@link #getRobotYawPitchRollAngles()}.
+   */
+  @Override
+  public Orientation getRobotOrientation(AxesReference reference, AxesOrder order, AngleUnit angleUnit) {
+    // Blindly using System.nanoTime() here isn't ideal, but no better option, I think
+    return new Orientation(AxesReference.EXTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES,(float) getYaw(AngleUnit.DEGREES), 0f , 0f, System.nanoTime())
+            .toAxesReference(reference)
+            .toAxesOrder(order)
+            .toAngleUnit(angleUnit);
+  }
+
+  /**
+   * @return A {@link Quaternion} object representing the current orientation of the robot
+   * in the Robot Coordinate System, relative to the robot's position the last time
+   * that {@link #resetYaw()} was called, as if the robot was perfectly level at that time.
+   * <p><p>
+   * Quaternions provide an advanced way to access orientation data that will work well
+   * for any orientation of the robot, even where other types of orientation data would
+   * encounter issues such as gimbal lock.
+   */
+  // qy and qw being the same is perfectly fine
+  // and extracing it into a variable would make this unnecessarily complicated
+  // also for some reason IntelliJ keeps forgetting this warning exists so also supress RedundantSuppression
+  @SuppressWarnings({"DuplicateExpressions", "RedundantSuppression"})
+  @Override
+  public Quaternion getRobotOrientationAsQuaternion() {
+    // is this math right?
+    double yaw = getYaw(AngleUnit.RADIANS); // this has to be radians
+    float qx = (float) (Math.cos(yaw/2) - Math.sin(yaw/2));
+    float qy = (float) (Math.cos(yaw/2) + Math.sin(yaw/2));
+    float qz = (float) (Math.sin(yaw/2) - Math.cos(yaw/2));
+    float qw = (float) (Math.cos(yaw/2) + Math.sin(yaw/2));
+    return new Quaternion(qw, qx, qy, qz, System.nanoTime());
+  }
+
+  /**
+   * @param unit the unit to return the velocity in
+   * @return The angular velocity of the robot (how fast it's turning around the three axes) in units per second
+   */
+  @Override
+  public AngularVelocity getRobotAngularVelocity(AngleUnit unit) {
+    return new AngularVelocity(unit,0f,0f,(float) getYawVelocity(unit),System.nanoTime());
+  }
+
+  /**
+   * @param unit the unit to return the velocity in
+   * @return The yaw velocity of the robot in units per second
+   */
+  public double getYawVelocity(AngleUnit unit) {
+    if (oldYawAge.milliseconds() > 1) { // only read if necessary (is this value big enough?)
+      getYaw(AngleUnit.DEGREES); // the output value doesn't matter, just doing this to trigger the filter
+    }
+    double yawVelocity = filteredYawVel;
+    return unit.fromDegrees(yawVelocity);
+  }
+
+  /**
+   * @param yaw current yaw in degrees
+   * @return yaw velocity in degrees/sec
+   */
+  private double getRawYawVelocity(double yaw) {
+    double yawVel = (yaw - oldYaw) / oldYawAge.seconds();
+    oldYaw = yaw;
+    oldYawAge.reset();
+    return yawVel;
+  }
+
+  /**
+   * Updates the lowpass filter based on an input in degrees
+   * @param yaw input yaw in degrees
+   */
+  private void updateLowpassFilter(double yaw) {
+    if (yaw != oldYaw) { // ensure this is a different loop with different bulk read data,
+      // then update the low-pass filter
+      //(is milliseconds the right unit?)
+      filteredYawVel += filteredYawVelAge.milliseconds() * (getRawYawVelocity(yaw) - filteredYawVel) / lowpassSmoothing;
+      filteredYawVelAge.reset();
+    }
+  }
+
+  private void resetLowpassFilter(double setValue) {
+    filteredYawVel = 0;
+    oldYaw = setValue;
+    filteredYawVelAge.reset();
+    oldYawAge.reset();
   }
 }
