@@ -92,7 +92,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
       parameterLabels = { "angleUnit" }
   )
   public double getYaw(AngleUnit unit) {
-    double yaw = getRawYaw() - zeroOffset;
+    double yaw = getRawYaw() - getZeroOffset(AngleUnit.DEGREES);
     updateLowpassFilter(yaw);
     return unit.fromDegrees(yaw);
   }
@@ -135,7 +135,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   public void setYaw(double newAngle, AngleUnit unit) {
     newAngle = unit.toDegrees(newAngle);
     resetLowpassFilter(newAngle);
-    zeroOffset = getRawYaw() - newAngle;
+    setZeroOffset(getRawYaw() - newAngle, AngleUnit.DEGREES);
   }
 
   /**
