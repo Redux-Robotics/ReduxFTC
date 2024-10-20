@@ -40,6 +40,7 @@ import java.util.Set;
 /**
  * Device class for a Redux Robotics Canandgyro connected via an analog port.
  * @author guineawheek@reduxrobotics.com
+ * @author j5155 ftcjdhs@gmail.com
  */
 @ExportClassToBlocks
 @AnalogSensorType
