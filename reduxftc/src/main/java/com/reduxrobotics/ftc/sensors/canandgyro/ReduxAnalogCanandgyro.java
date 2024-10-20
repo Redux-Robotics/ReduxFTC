@@ -57,9 +57,9 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   // The canandgyro itself will only output a maximum of MAX_VOLTAGE volts.
   private static final double MAX_VOLTAGE = 3.3;
 
-  private double oldYaw = 0; // radians
+  private double oldYaw = 0; // degrees
   private final ElapsedTime oldYawAge = new ElapsedTime();
-  private double filteredYawVel = 0; // radians/sec
+  private double filteredYawVel = 0; // degrees/sec
   private final ElapsedTime filteredYawVelAge = new ElapsedTime();
 
   private static final double lowpassSmoothing = 10.0; // https://phrogz.net/js/framerate-independent-low-pass-filter.html
@@ -91,9 +91,9 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
       parameterLabels = { "angleUnit" }
   )
   public double getYaw(AngleUnit unit) {
-    double yaw = AngleUnit.normalizeRadians(readZeroedVoltage() / MAX_VOLTAGE * (Math.PI * 2));
+    double yaw = AngleUnit.normalizeDegrees(readZeroedVoltage() / MAX_VOLTAGE * 360.0);
     updateLowpassFilter(yaw);
-    return unit.fromRadians(yaw);
+    return unit.fromDegrees(yaw);
   }
 
   /**
@@ -115,10 +115,10 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
       parameterLabels = { "newAngle", "angleUnit" }
   )
   public void setYaw(double newAngle, AngleUnit unit) {
-    newAngle = unit.toRadians(newAngle);
+    newAngle = unit.toDegrees(newAngle);
     resetLowpassFilter(newAngle);
 
-    newAngle *= MAX_VOLTAGE / (Math.PI * 2);
+    newAngle *= MAX_VOLTAGE / 360.0;
     zeroOffset = readRawVoltage() - newAngle;
   }
 
@@ -166,7 +166,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
       parameterLabels = { "angleUnit" }
   )
   public double getZeroOffset(AngleUnit unit) {
-      return unit.fromRadians(zeroOffset / MAX_VOLTAGE * 2 * Math.PI);
+      return unit.fromDegrees(zeroOffset / MAX_VOLTAGE * 360);
   }
 
   /**
@@ -190,7 +190,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
       parameterLabels = { "newOffset", "angleUnit" }
   )
   public void setZeroOffset(double newOffset, AngleUnit unit) {
-    newOffset = unit.toRadians(newOffset) / (2 * Math.PI);
+    newOffset = unit.toDegrees(newOffset) / 360;
     zeroOffset = newOffset * MAX_VOLTAGE;
 
   }
@@ -306,7 +306,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   @Override
   public YawPitchRollAngles getRobotYawPitchRollAngles() {
     // Blindly using System.nanoTime() here isn't ideal, but no better option, I think
-    return new YawPitchRollAngles(AngleUnit.RADIANS,getYaw(AngleUnit.RADIANS),0.0,0.0,System.nanoTime());
+    return new YawPitchRollAngles(AngleUnit.DEGREES,getYaw(AngleUnit.DEGREES),0.0,0.0,System.nanoTime());
   }
 
   /**
@@ -320,7 +320,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   @Override
   public Orientation getRobotOrientation(AxesReference reference, AxesOrder order, AngleUnit angleUnit) {
     // Blindly using System.nanoTime() here isn't ideal, but no better option, I think
-    return new Orientation(AxesReference.EXTRINSIC, AxesOrder.ZYX, AngleUnit.RADIANS,(float) getYaw(AngleUnit.RADIANS), 0f , 0f, System.nanoTime())
+    return new Orientation(AxesReference.EXTRINSIC, AxesOrder.ZYX, AngleUnit.DEGREES,(float) getYaw(AngleUnit.DEGREES), 0f , 0f, System.nanoTime())
             .toAxesReference(reference)
             .toAxesOrder(order)
             .toAngleUnit(angleUnit);
@@ -338,7 +338,7 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   @Override
   public Quaternion getRobotOrientationAsQuaternion() {
     // is this math right?
-    double yaw = getYaw(AngleUnit.RADIANS);
+    double yaw = getYaw(AngleUnit.RADIANS); // this has to be radians
     float qx = (float) (Math.cos(yaw/2) - Math.sin(yaw/2));
     float qy = (float) (Math.cos(yaw/2) + Math.sin(yaw/2));
     float qz = (float) (Math.sin(yaw/2) - Math.cos(yaw/2));
@@ -352,7 +352,6 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
    */
   @Override
   public AngularVelocity getRobotAngularVelocity(AngleUnit unit) {
-
     return new AngularVelocity(unit,0f,0f,(float) getYawVelocity(unit),System.nanoTime());
   }
 
@@ -362,15 +361,15 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
    */
   public double getYawVelocity(AngleUnit unit) {
     if (oldYawAge.milliseconds() > 1) { // only read if necessary (is this value big enough?)
-      getYaw(AngleUnit.RADIANS); // the output value doesn't matter, just doing this to trigger the filter
+      getYaw(AngleUnit.DEGREES); // the output value doesn't matter, just doing this to trigger the filter
     }
     double yawVelocity = filteredYawVel;
-    return unit.fromRadians(yawVelocity);
+    return unit.fromDegrees(yawVelocity);
   }
 
   /**
-   * @param yaw current yaw in radians
-   * @return yaw velocity in radians/sec
+   * @param yaw current yaw in degrees
+   * @return yaw velocity in degrees/sec
    */
   private double getRawYawVelocity(double yaw) {
     double yawVel = (yaw - oldYaw) / oldYawAge.seconds();
@@ -380,8 +379,8 @@ public class ReduxAnalogCanandgyro implements AnalogSensor, OrientationSensor, H
   }
 
   /**
-   * Updates the lowpass filter based on an input in radians
-   * @param yaw input yaw in radians
+   * Updates the lowpass filter based on an input in degrees
+   * @param yaw input yaw in degrees
    */
   private void updateLowpassFilter(double yaw) {
     if (yaw != oldYaw) { // ensure this is a different loop with different bulk read data,
